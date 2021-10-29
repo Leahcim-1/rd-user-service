@@ -1,33 +1,42 @@
 import Router from '@koa/router'
 import fs from 'fs'
+import path from 'path'
 import UserService from '../service/user-service.js'
 import ERRNO from '../service/err-code.js'
 
 const router = new Router()
-const connInfo = JSON.parse(fs.readFileSync('conn-config.json'));
+
+// Check Conn Config
+const configPath = path.resolve('conn-config.json')
+if (!fs.existsSync(configPath)) throw Error('Database Connection Info Config File Not Found')
+const connInfo = JSON.parse(fs.readFileSync(configPath, { encoding: 'utf-8' }))
 
 // Create User Service
 const userService = new UserService(connInfo)
 
-
 /**
  * The factory function for creating response body
- * @param {Errno} message 
- * @param {Object} data 
- * @param {Array} links 
- * @returns 
+ * @param {Errno} message
+ * @param {Object} data
+ * @param {Array} links
+ * @returns
  */
 function createResBody (message, data, links) {
   return JSON.stringify({
     message,
     data,
-    links,
+    links
   })
 }
 
 /*
  * Router Below
  */
+
+router.get('/', ({ res }) => {
+  res.end('Hello, this is Bender, the bending machine')
+})
+
 router.get('/api', ({ res }) => {
   res.end('Hello, this is Bender, the bending machine')
 })
@@ -36,8 +45,16 @@ router.get('/api', ({ res }) => {
  * @METHOD GET
  * @PATH /user
  */
-router.get('/api/users', async ({ response }) => {
-  const { errno, res } = await userService.getAllUsers(10, 0)
+router.get('/api/users', async ({ qs, response }) => {
+  const { fields = '', limit = '10', offset = '0' } = qs
+
+  const field = fields ? fields.split(',') : []
+
+  const { errno, res } = await userService.getAllUsers(
+    field,
+    parseInt(limit, 10),
+    parseInt(offset, 10)
+  )
   const responseCodeMap = {
     [ERRNO.OK]: 200,
     [ERRNO.DBERR]: 500,
@@ -51,9 +68,12 @@ router.get('/api/users', async ({ response }) => {
  * @METHOD GET
  * @PATH /user/:id
  */
-router.get('/api/users/:id', async ({ response, params }) => {
+router.get('/api/users/:id', async ({ qs, response, params }) => {
   const { id } = params
-  const { errno, res } = await userService.getUserById(id)
+  const { fields = '' } = qs
+  const field = fields ? fields.split(',') : []
+
+  const { errno, res } = await userService.getUserById(id, field)
   const responseCodeMap = {
     [ERRNO.OK]: res.length === 0 ? 404 : 200,
     [ERRNO.DBERR]: 500,
@@ -140,15 +160,15 @@ router.put('/api/users/:id', async ({ params, request, response }) => {
     address_id = ''
   } = request.body
 
-  // filter empty field 
-  const data = { 
+  // filter empty field
+  const data = {
     first_name,
     last_name,
     email,
-    address_id,
+    address_id
   }
-  for (let [key, val] of Object.entries(data)) {
-     if (!val) delete data[key]
+  for (const [key, val] of Object.entries(data)) {
+    if (!val) delete data[key]
   }
 
   // User Service
@@ -157,25 +177,25 @@ router.put('/api/users/:id', async ({ params, request, response }) => {
     [ERRNO.OK]: 202,
     [ERRNO.UN]: 500,
     [ERRNO.NOEXIST]: 400,
-    [ERRNO.DUPEM]: 409,
+    [ERRNO.DUPEM]: 409
   }
   response.status = responseCodeMap[errno]
   response.body = createResBody(errno, res)
 })
- 
+
 /**
  * @METHOD DELETE
  * @PATH /user/:id
  */
 router.delete('/api/users/:id', async ({ params, response }) => {
   const { id } = params
-  
+
   // User Service
   const { errno, res } = await userService.delete(id)
   const responseCodeMap = {
     [ERRNO.OK]: 200,
     [ERRNO.UN]: 500,
-    [ERRNO.NOEXIST]: 400,
+    [ERRNO.NOEXIST]: 400
   }
   response.status = responseCodeMap[errno]
   response.body = createResBody(errno, res)

@@ -61,23 +61,23 @@ export default class MySQL {
   }
 
   selectStatement (schema, table, fields = [], limit = 10, offset = 0) {
-    const selectFields = fields.length === 0 
-      ? '*' 
+    const selectFields = fields.length === 0
+      ? '*'
       : fields.join(', ')
 
-    let selection = `
+    const selection = `
     SELECT ${selectFields} 
     FROM ${schema}.${table}
-    ` 
-    
+    `
+
     return async (condition = '1=1', value) => {
       const statement = `
       ${selection}
       WHERE ${condition} 
       LIMIT ${limit} 
       OFFSET ${offset}
-      ` 
-      
+      `
+
       return await this.executeQuery(statement, value)
     }
   }

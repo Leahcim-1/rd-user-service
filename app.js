@@ -1,7 +1,6 @@
 import Koa from 'koa'
 import BodyParser from 'koa-body'
-import fs from 'fs'
-import path from 'path'
+import qs from 'qs'
 import { dev, prod } from './config.js'
 import router from './router/index.js'
 import Logger from './util/logger.js'
@@ -9,7 +8,7 @@ import Logger from './util/logger.js'
 const app = new Koa()
 const env = process.env.NODE_ENV
 const isDev = env === 'dev'
-const HOST = isDev ? dev.host: prod.host
+const HOST = isDev ? dev.host : prod.host
 const PORT = isDev ? dev.port : prod.port
 
 // Middleware
@@ -25,16 +24,30 @@ app.use(async ({ request }, next) => {
 })
 
 /**
+ * QueryString
+ */
+app.use(async (ctx, next) => {
+  const { querystring } = ctx.request
+  ctx.qs = qs.parse(querystring)
+  await next()
+})
+
+/**
+ * Set response interceptor
+ */
+app.use(async (ctx, next) => {
+  await next()
+  if (ctx.URL.pathname.includes('api')) {
+    ctx.set({
+      'Content-Type': 'application/json'
+    })
+  }
+})
+
+/**
  * Body Parser
  */
 app.use(BodyParser())
-
-// Check Conn Config
-const configPath = path.resolve('conn-config.json')
-if (!fs.existsSync(configPath)) throw Error('Database Connection Info Config File Not Found')
-const connInfo = JSON.parse(fs.readFileSync(configPath, { encoding: 'utf-8' }))
-
-
 
 /*
  * Server Listening

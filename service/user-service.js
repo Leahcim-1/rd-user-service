@@ -26,47 +26,51 @@ export default class UserService {
     }
   }
 
-
-  async checkExistedId(id) {
+  async checkExistedId (id) {
     // * Check existed ID
     const condition = this.sql.createColumnValueCondition('id', id)
     const record = await this.getUserByCondition(condition)
-    return record 
-        && record.errno === ERRNO.OK
-        && record.res.length !== 0 
+    return record &&
+        record.errno === ERRNO.OK &&
+        record.res.length !== 0
   }
 
-  async checkNonExistedId(id) {
+  async checkNonExistedId (id) {
     // * Check non-existed ID
     const condition = this.sql.createColumnValueCondition('id', id)
     const record = await this.getUserByCondition(condition)
-    return record 
-        && record.errno === ERRNO.OK
-        && record.res.length === 0 
+    return record &&
+        record.errno === ERRNO.OK &&
+        record.res.length === 0
   }
 
-  async checkDupEmail(email) {
+  async checkDupEmail (email) {
     const condition = this.sql.createColumnValueCondition('email', email)
     const existedEmail = await this.getUserByCondition(condition)
-    console.log(existedEmail)
-    return existedEmail
-        && existedEmail.errno === ERRNO.OK
-        && existedEmail.res.length > 0
+    return existedEmail &&
+        existedEmail.errno === ERRNO.OK &&
+        existedEmail.res.length > 0
   }
 
-  async getAllUsers (limit = 10, offset = 0) {
-    const fn = this.sql.selectStatement(this.schema, this.table, [], limit, offset)
+  async getAllUsers (fields = [], limit = 10, offset = 0) {
+    const fn = this.sql.selectStatement(this.schema, this.table, fields, limit, offset)
     return await this.executeWithTry(fn, true)
   }
 
-  async getUserByCondition (condition) {
-    const fn = async () => await this.sql.selectStatement(this.schema, this.table)(condition)
+  async getUserByCondition (condition, fields = [], limit = 10, offset = 0) {
+    const fn = async () => await this.sql.selectStatement(
+      this.schema,
+      this.table,
+      fields,
+      limit,
+      offset
+    )(condition)
     return await this.executeWithTry(fn, true)
   }
 
-  async getUserById (id) {
+  async getUserById (id, fields = []) {
     const condition = this.sql.createColumnValueCondition('id', id)
-    return await this.getUserByCondition(condition)
+    return await this.getUserByCondition(condition, fields)
   }
 
   async postUser (id, data) {
@@ -100,9 +104,9 @@ export default class UserService {
     // execute PUT
     const condition = this.sql.createColumnValueCondition('id', id)
     const fn = async () => await this.sql.updateStatement(
-      this.schema, 
-      this.table, 
-      condition, 
+      this.schema,
+      this.table,
+      condition,
       data
     )
     return await this.executeWithTry(fn, false)
