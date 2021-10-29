@@ -50,29 +50,62 @@ export default class MySQL {
     }
   }
 
-  __createWhereClause (kv = {}) {
-    const where = Object.keys(kv).map(key => '`' + key + '`' + ' = ?').join(' AND ')
+  createWhereClause (kv = {}) {
+    const condition = Object.keys(kv).map(key => '`' + key + '`' + ' = ?').join(' AND ')
     const value = Object.values(kv)
-    return { where, value }
+    return { condition, value }
   }
 
-  async getByWhereObject (schema, table, kv = {}) {
-    const { where, value } = this.__createWhereClause(kv)
-    const statement = `select * from ${schema}.${table} where ${where}`
-    return await this.executeQuery(statement, value)
+  createColumnValueCondition (column, value) {
+    return `${column} like '${value}%'`
   }
 
-  async getByQueryPair (schema, table, column, value) {
-    const statement = `select * from ${schema}.${table} where ${column} like '${value}%'`
-    return await this.executeQuery(statement)
+  selectStatement (schema, table, fields = [], limit = 10, offset = 0) {
+    const selectFields = fields.length === 0 
+      ? '*' 
+      : fields.join(', ')
+
+    let selection = `
+    SELECT ${selectFields} 
+    FROM ${schema}.${table}
+    ` 
+    
+    return async (condition = '1=1', value) => {
+      const statement = `
+      ${selection}
+      WHERE ${condition} 
+      LIMIT ${limit} 
+      OFFSET ${offset}
+      ` 
+      
+      return await this.executeQuery(statement, value)
+    }
   }
 
-  async insert (schema, table, data = {}) {
+  async insertStatement (schema, table, data = {}) {
     const col = Object.keys(data).join(', ')
     const val = Object.values(data).map(v => `'${v}'`).join(', ')
     const statement = `
       INSERT INTO ${schema}.${table} (${col})
       VALUES (${val});
+    `
+    return await this.executeQuery(statement)
+  }
+
+  async deleteStatement (schema, table, condition) {
+    const statement = `
+      DELETE FROM ${schema}.${table} 
+      WHERE ${condition}
+    `
+    return await this.executeQuery(statement)
+  }
+
+  async updateStatement (schema, table, condition, data = {}) {
+    const modification = Object.entries(data).map(([k, v]) => `${k} = '${v}'`).join(', ')
+    const statement = `
+      UPDATE ${schema}.${table} 
+      SET ${modification}
+      WHERE ${condition}
     `
     return await this.executeQuery(statement)
   }

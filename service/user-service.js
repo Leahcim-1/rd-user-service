@@ -1,4 +1,5 @@
 import MySQL from '../db/MySQL-Service.js'
+import Logger from '../util/logger.js'
 import ERRNO from './err-code.js'
 
 export default class UserService {
@@ -20,64 +21,104 @@ export default class UserService {
       const res = await fn()
       return this.createRes(ERRNO.OK, isReturning ? res : {})
     } catch (e) {
+      Logger.log(e)
       return this.createRes(ERRNO.DBERR, e)
     }
   }
 
+
+  async checkExistedId(id) {
+    // * Check existed ID
+    const condition = this.sql.createColumnValueCondition('id', id)
+    const record = await this.getUserByCondition(condition)
+    return record 
+        && record.errno === ERRNO.OK
+        && record.res.length !== 0 
+  }
+
+  async checkNonExistedId(id) {
+    // * Check non-existed ID
+    const condition = this.sql.createColumnValueCondition('id', id)
+    const record = await this.getUserByCondition(condition)
+    return record 
+        && record.errno === ERRNO.OK
+        && record.res.length === 0 
+  }
+
+  async checkDupEmail(email) {
+    const condition = this.sql.createColumnValueCondition('email', email)
+    const existedEmail = await this.getUserByCondition(condition)
+    console.log(existedEmail)
+    return existedEmail
+        && existedEmail.errno === ERRNO.OK
+        && existedEmail.res.length > 0
+  }
+
   async getAllUsers (limit = 10, offset = 0) {
-    const fn = async () => await this.sql.executeQuery(`SELECT * FROM ${this.schema}.${this.table} LIMIT ${limit} OFFSET ${offset}`)
+    const fn = this.sql.selectStatement(this.schema, this.table, [], limit, offset)
+    return await this.executeWithTry(fn, true)
+  }
+
+  async getUserByCondition (condition) {
+    const fn = async () => await this.sql.selectStatement(this.schema, this.table)(condition)
     return await this.executeWithTry(fn, true)
   }
 
   async getUserById (id) {
-    const fn = async () => await this.sql.getByQueryPair(this.schema, this.table, 'id', id)
-    return await this.executeWithTry(fn, true)
+    const condition = this.sql.createColumnValueCondition('id', id)
+    return await this.getUserByCondition(condition)
   }
 
   async postUser (id, data) {
-    // * Check existed ID
-    const existedID = await this.sql.getByQueryPair(this.schema, this.table, 'id', id)
-    if (existedID && existedID.length > 0) return this.createRes(ERRNO.DUPID)
+    // * Check User Existed
+    const existed = await this.checkExistedId(id)
+    if (existed) return this.createRes(ERRNO.DUPID)
 
     // * Check existed Email
     const { email = '' } = data
     if (email) {
-      const existedEmail = await this.sql.getByQueryPair(this.schema, this.table, 'email', email)
-      if (existedEmail && existedEmail.length > 0) return this.createRes(ERRNO.DUPEM)
+      const existedEmail = await this.checkDupEmail(email)
+      if (existedEmail) return this.createRes(ERRNO.DUPEM)
     }
 
-    const fn = async () => await this.sql.insert(this.schema, this.table, data)
+    const fn = async () => await this.sql.insertStatement(this.schema, this.table, data)
     return await this.executeWithTry(fn, false)
   }
 
   async updateUser (id, data = {}) {
-    // * Check existed record
-    const existed = await this.sql.getByQueryPair(this.schema, this.table, 'id', id)
-    if (!existed || existed.length === 0) return this.createRes(ERRNO.NOEXIST)
+    // * Check User Existed
+    const nonExisted = await this.checkNonExistedId(id)
+    if (nonExisted) return this.createRes(ERRNO.NOEXIST)
 
     // * Check existed Email
     const { email = '' } = data
     if (email) {
-      const existedEmail = await this.sql.getByQueryPair(this.schema, this.table, 'email', email)
-      if (existedEmail && existedEmail.length > 0) return this.createRes(ERRNO.DUPEM)
+      const existedEmail = await this.checkDupEmail(email)
+      if (existedEmail) return this.createRes(ERRNO.DUPEM)
     }
 
-    const modification = Object.entries(data).map(([k, v]) => `${k} = '${v}'`).join(', ')
-    const statement = `
-      UPDATE ${this.schema}.${this.table} 
-      SET ${modification}
-      where id = ${id}
-    `
-    const fn = async () => await this.sql.executeQuery(statement)
+    // execute PUT
+    const condition = this.sql.createColumnValueCondition('id', id)
+    const fn = async () => await this.sql.updateStatement(
+      this.schema, 
+      this.table, 
+      condition, 
+      data
+    )
     return await this.executeWithTry(fn, false)
   }
 
   async delete (id) {
-    // * Check existed record
-    const existed = await this.sql.getByQueryPair(this.schema, this.table, 'id', id)
-    if (!existed || existed.length === 0) return this.createRes(ERRNO.NOEXIST)
+    // * Check User Non-existed
+    const nonExisted = await this.checkNonExistedId(id)
+    if (nonExisted) return this.createRes(ERRNO.NOEXIST)
 
-    const fn = async () => await this.sql.executeQuery(`DELETE FROM ${this.schema}.${this.table} WHERE id = ${id}`)
+    const condition = this.sql.createColumnValueCondition('id', id)
+    const fn = async () => await this.sql.deleteStatement(
+      this.schema,
+      this.table,
+      condition
+    )
     return await this.executeWithTry(fn, false)
   }
 }

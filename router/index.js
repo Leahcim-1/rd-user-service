@@ -9,17 +9,26 @@ const connInfo = JSON.parse(fs.readFileSync('conn-config.json'));
 // Create User Service
 const userService = new UserService(connInfo)
 
-function createResBody (message, data) {
+
+/**
+ * The factory function for creating response body
+ * @param {Errno} message 
+ * @param {Object} data 
+ * @param {Array} links 
+ * @returns 
+ */
+function createResBody (message, data, links) {
   return JSON.stringify({
     message,
-    data
+    data,
+    links,
   })
 }
 
 /*
  * Router Below
  */
-router.get('home', '/', ({ res }) => {
+router.get('/api', ({ res }) => {
   res.end('Hello, this is Bender, the bending machine')
 })
 
@@ -27,9 +36,14 @@ router.get('home', '/', ({ res }) => {
  * @METHOD GET
  * @PATH /user
  */
-router.get('/user', async ({ response }) => {
+router.get('/api/users', async ({ response }) => {
   const { errno, res } = await userService.getAllUsers(10, 0)
-  response.status = errno === ERRNO.OK ? 200 : 400
+  const responseCodeMap = {
+    [ERRNO.OK]: 200,
+    [ERRNO.DBERR]: 500,
+    [ERRNO.UN]: 500
+  }
+  response.status = responseCodeMap[errno]
   response.body = createResBody(errno, res)
 })
 
@@ -37,12 +51,13 @@ router.get('/user', async ({ response }) => {
  * @METHOD GET
  * @PATH /user/:id
  */
-router.get('/user/:id', async ({ response, params }) => {
+router.get('/api/users/:id', async ({ response, params }) => {
   const { id } = params
   const { errno, res } = await userService.getUserById(id)
   const responseCodeMap = {
     [ERRNO.OK]: res.length === 0 ? 404 : 200,
-    [ERRNO.UN]: 400
+    [ERRNO.DBERR]: 500,
+    [ERRNO.UN]: 500
   }
   response.status = responseCodeMap[errno]
   response.body = createResBody(errno, res)
@@ -52,7 +67,7 @@ router.get('/user/:id', async ({ response, params }) => {
  * @METHOD GET
  * @PATH /user/:id/address
  */
-router.get('/user/:id/address', async ({ response, params }) => {
+router.get('/api/user/:id/address', async ({ response, params }) => {
   const { id } = params
   const { errno, res } = await userService.getUserById(id)
   const responseCodeMap = {
@@ -70,7 +85,7 @@ router.get('/user/:id/address', async ({ response, params }) => {
  * @METHOD POST
  * @PATH /user
  */
-router.post('/user', async ({ request, response }) => {
+router.post('/api/users', async ({ request, response }) => {
   const {
     id = '',
     first_name = '',
@@ -95,7 +110,7 @@ router.post('/user', async ({ request, response }) => {
   })
 
   const responseCodeMap = {
-    [ERRNO.OK]: 200,
+    [ERRNO.OK]: 201,
     [ERRNO.UN]: 500,
     [ERRNO.DUPID]: 400,
     [ERRNO.DUPEM]: 409
@@ -108,7 +123,7 @@ router.post('/user', async ({ request, response }) => {
  * @METHOD POST
  * @PATH /user/:id/address
  */
-router.post('/user/:id/address', ctx => {
+router.post('/api/user/:id/address', ctx => {
 
 })
 
@@ -116,7 +131,7 @@ router.post('/user/:id/address', ctx => {
  * @METHOD PUT
  * @PATH /user
  */
-router.put('/user/:id', async ({ params, request, response }) => {
+router.put('/api/users/:id', async ({ params, request, response }) => {
   const { id } = params
   const {
     first_name = '',
@@ -139,7 +154,7 @@ router.put('/user/:id', async ({ params, request, response }) => {
   // User Service
   const { errno, res } = await userService.updateUser(id, data)
   const responseCodeMap = {
-    [ERRNO.OK]: 200,
+    [ERRNO.OK]: 202,
     [ERRNO.UN]: 500,
     [ERRNO.NOEXIST]: 400,
     [ERRNO.DUPEM]: 409,
@@ -147,12 +162,12 @@ router.put('/user/:id', async ({ params, request, response }) => {
   response.status = responseCodeMap[errno]
   response.body = createResBody(errno, res)
 })
-
+ 
 /**
  * @METHOD DELETE
  * @PATH /user/:id
  */
-router.delete('/user/:id', async ({ params, response }) => {
+router.delete('/api/users/:id', async ({ params, response }) => {
   const { id } = params
   
   // User Service
