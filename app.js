@@ -1,9 +1,12 @@
 import Koa from 'koa'
 import BodyParser from 'koa-body'
-import qs from 'qs'
 import { dev, prod } from './config.js'
+import {
+  qsMiddleware,
+  requestInterceptor,
+  responseInterceptor
+} from './middleware/index.js'
 import router from './router/index.js'
-import Logger from './util/logger.js'
 
 const app = new Koa()
 const env = process.env.NODE_ENV
@@ -11,43 +14,19 @@ const isDev = env === 'dev'
 const HOST = isDev ? dev.host : prod.host
 const PORT = isDev ? dev.port : prod.port
 
-// Middleware
+/* <- Middleware Below -> */
 
-/**
- * Request Logger
- */
-app.use(async ({ request }, next) => {
-  Logger.log('\n\n')
-  Logger.log(request.method, request.URL.pathname)
-  Logger.log('Headers:', request.header)
-  await next()
-})
+// Request Interceptor
+app.use(requestInterceptor)
 
-/**
- * QueryString
- */
-app.use(async (ctx, next) => {
-  const { querystring } = ctx.request
-  ctx.qs = qs.parse(querystring)
-  await next()
-})
+// Query String Parsing
+app.use(qsMiddleware)
 
-/**
- * Set response interceptor
- */
-app.use(async (ctx, next) => {
-  await next()
-  if (ctx.URL.pathname.includes('api')) {
-    ctx.set({
-      'Content-Type': 'application/json'
-    })
-  }
-})
-
-/**
- * Body Parser
- */
+// Pose Body Parsing
 app.use(BodyParser())
+
+// Response Interceptor
+app.use(responseInterceptor)
 
 /*
  * Server Listening

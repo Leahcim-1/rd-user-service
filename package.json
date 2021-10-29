@@ -22,7 +22,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint --fix --ext .js app.js service/* db/* router/*",
+    "lint": "eslint --fix --ext .js app.js service/* db/* router/* middleware/*",
     "dev": "NODE_ENV=dev nodemon app.js",
     "deploy": "NODE_ENV=prod pm2 start app.js --watch app.js --name user-service; pm2 log"
   },
