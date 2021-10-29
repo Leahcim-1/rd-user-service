@@ -21,12 +21,12 @@ const userService = new UserService(connInfo)
  * @param {Array} links
  * @returns
  */
-function createResBody (message, data, links) {
-  return JSON.stringify({
+function createResBody (message, data, links = []) {
+  return {
     message,
     data,
     links
-  })
+  }
 }
 
 /*
@@ -45,7 +45,10 @@ router.get('/api', ({ res }) => {
  * @METHOD GET
  * @PATH /user
  */
-router.get('/api/users', async ({ qs, response }) => {
+router.get('/api/users', async ({ request, qs, response }) => {
+
+  console.log(request.querystring)
+
   const { fields = '', limit = '10', offset = '0' } = qs
 
   const field = fields ? fields.split(',') : []
@@ -60,8 +63,14 @@ router.get('/api/users', async ({ qs, response }) => {
     [ERRNO.DBERR]: 500,
     [ERRNO.UN]: 500
   }
+
   response.status = responseCodeMap[errno]
-  response.body = createResBody(errno, res)
+
+  const links = response.status === 200 && res.length > 0
+    ? [{ rel: 'cur', link: `/api/users?limit=${limit}&offset=${offset}`}]
+    : []
+
+  response.body = createResBody(errno, res, links)
 })
 
 /**

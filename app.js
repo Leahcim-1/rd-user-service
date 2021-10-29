@@ -1,8 +1,9 @@
 import Koa from 'koa'
-import BodyParser from 'koa-body'
 import { dev, prod } from './config.js'
 import {
+  bodyMiddleware,
   qsMiddleware,
+  paginationMiddleware,
   requestInterceptor,
   responseInterceptor
 } from './middleware/index.js'
@@ -23,10 +24,13 @@ app.use(requestInterceptor)
 app.use(qsMiddleware)
 
 // Pose Body Parsing
-app.use(BodyParser())
+app.use(bodyMiddleware)
 
 // Response Interceptor
 app.use(responseInterceptor)
+
+// Response Pagination
+app.use(paginationMiddleware)
 
 /*
  * Server Listening
